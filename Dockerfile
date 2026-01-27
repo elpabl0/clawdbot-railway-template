@@ -1,7 +1,8 @@
-# Build gog (gogcli) with a modern Go toolchain
-FROM golang:1.23-bookworm AS gog-build
+# Build gog (gogcli) with Go 1.25+
+FROM golang:1.25.6-bookworm AS gog-build
 RUN apt-get update && apt-get install -y --no-install-recommends git make ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
 RUN git clone --depth 1 https://github.com/steipete/gogcli.git /tmp/gogcli \
  && cd /tmp/gogcli \
  && make \
