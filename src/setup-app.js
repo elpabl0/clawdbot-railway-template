@@ -7,6 +7,24 @@
   var authChoiceEl = document.getElementById('authChoice');
   var logEl = document.getElementById('log');
 
+  // Debug console
+  var consoleCmdEl = document.getElementById('consoleCmd');
+  var consoleArgEl = document.getElementById('consoleArg');
+  var consoleRunEl = document.getElementById('consoleRun');
+  var consoleOutEl = document.getElementById('consoleOut');
+
+  // Config editor
+  var configPathEl = document.getElementById('configPath');
+  var configTextEl = document.getElementById('configText');
+  var configReloadEl = document.getElementById('configReload');
+  var configSaveEl = document.getElementById('configSave');
+  var configOutEl = document.getElementById('configOut');
+
+  // Import
+  var importFileEl = document.getElementById('importFile');
+  var importRunEl = document.getElementById('importRun');
+  var importOutEl = document.getElementById('importOut');
+
   function setStatus(s) {
     statusEl.textContent = s;
   }
@@ -56,12 +74,17 @@
   function refreshStatus() {
     setStatus('Loading...');
     return httpJson('/setup/api/status').then(function (j) {
-      var ver = j.clawdbotVersion ? (' | ' + j.clawdbotVersion) : '';
-      setStatus((j.configured ? 'Configured - open /clawdbot' : 'Not configured - run setup below') + ver);
+      var ver = j.openclawVersion ? (' | ' + j.openclawVersion) : '';
+      setStatus((j.configured ? 'Configured - open /openclaw' : 'Not configured - run setup below') + ver);
       renderAuth(j.authGroups || []);
       // If channels are unsupported, surface it for debugging.
       if (j.channelsAddHelp && j.channelsAddHelp.indexOf('telegram') === -1) {
-        logEl.textContent += '\nNote: this clawdbot build does not list telegram in `channels add --help`. Telegram auto-add will be skipped.\n';
+        logEl.textContent += '\nNote: this openclaw build does not list telegram in `channels add --help`. Telegram auto-add will be skipped.\n';
+      }
+
+      // Attempt to load config editor content if present.
+      if (configReloadEl && configTextEl) {
+        loadConfigRaw();
       }
 
     }).catch(function (e) {
@@ -98,6 +121,94 @@
       logEl.textContent += '\nError: ' + String(e) + '\n';
     });
   };
+
+  // Debug console runner
+  function runConsole() {
+    if (!consoleCmdEl || !consoleRunEl) return;
+    var cmd = consoleCmdEl.value;
+    var arg = consoleArgEl ? consoleArgEl.value : '';
+    if (consoleOutEl) consoleOutEl.textContent = 'Running ' + cmd + '...\n';
+
+    return httpJson('/setup/api/console/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cmd: cmd, arg: arg })
+    }).then(function (j) {
+      if (consoleOutEl) consoleOutEl.textContent = (j.output || JSON.stringify(j, null, 2));
+      return refreshStatus();
+    }).catch(function (e) {
+      if (consoleOutEl) consoleOutEl.textContent += '\nError: ' + String(e) + '\n';
+    });
+  }
+
+  if (consoleRunEl) {
+    consoleRunEl.onclick = runConsole;
+  }
+
+  // Config raw load/save
+  function loadConfigRaw() {
+    if (!configTextEl) return;
+    if (configOutEl) configOutEl.textContent = '';
+    return httpJson('/setup/api/config/raw').then(function (j) {
+      if (configPathEl) {
+        configPathEl.textContent = 'Config file: ' + (j.path || '(unknown)') + (j.exists ? '' : ' (does not exist yet)');
+      }
+      configTextEl.value = j.content || '';
+    }).catch(function (e) {
+      if (configOutEl) configOutEl.textContent = 'Error loading config: ' + String(e);
+    });
+  }
+
+  function saveConfigRaw() {
+    if (!configTextEl) return;
+    if (!confirm('Save config and restart gateway? A timestamped .bak backup will be created.')) return;
+    if (configOutEl) configOutEl.textContent = 'Saving...\n';
+    return httpJson('/setup/api/config/raw', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: configTextEl.value })
+    }).then(function (j) {
+      if (configOutEl) configOutEl.textContent = 'Saved: ' + (j.path || '') + '\nGateway restarted.\n';
+      return refreshStatus();
+    }).catch(function (e) {
+      if (configOutEl) configOutEl.textContent += '\nError: ' + String(e) + '\n';
+    });
+  }
+
+  if (configReloadEl) configReloadEl.onclick = loadConfigRaw;
+  if (configSaveEl) configSaveEl.onclick = saveConfigRaw;
+
+  // Import backup
+  function runImport() {
+    if (!importRunEl || !importFileEl) return;
+    var f = importFileEl.files && importFileEl.files[0];
+    if (!f) {
+      alert('Pick a .tar.gz file first');
+      return;
+    }
+    if (!confirm('Import backup? This overwrites files under /data and restarts the gateway.')) return;
+
+    if (importOutEl) importOutEl.textContent = 'Uploading ' + f.name + ' (' + f.size + ' bytes)...\n';
+
+    return f.arrayBuffer().then(function (buf) {
+      return fetch('/setup/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/gzip' },
+        body: buf
+      });
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        if (importOutEl) importOutEl.textContent += t + '\n';
+        if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + t);
+        return refreshStatus();
+      });
+    }).catch(function (e) {
+      if (importOutEl) importOutEl.textContent += '\nError: ' + String(e) + '\n';
+    });
+  }
+
+  if (importRunEl) importRunEl.onclick = runImport;
 
   // Pairing approve helper
   var pairingBtn = document.getElementById('pairingApprove');
