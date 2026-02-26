@@ -97,7 +97,7 @@ COPY --from=openclaw-build /openclaw /openclaw
 COPY --from=openclaw-build /root/.claude /root/.claude
 
 # Provide an openclaw executable
-RUN printf '%s ' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw \
+RUN printf '#!/usr/bin/env bash\nexec node /openclaw/dist/entry.js "$@"\n' > /usr/local/bin/openclaw \
 && chmod +x /usr/local/bin/openclaw
 
 COPY src ./src
