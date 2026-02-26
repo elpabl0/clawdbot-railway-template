@@ -33,7 +33,11 @@ RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
 # Install Claude Code CLI (build stage)
 RUN curl -fsSL https://claude.ai/install.sh | bash
-
+RUN set -eux; \
+which claude || true; \
+find /root -maxdepth 4 -type f -name claude || true; \
+find /usr/local -maxdepth 4 -type f -name claude || true; \
+find /opt -maxdepth 4 -type f -name claude || true
 WORKDIR /openclaw
 
 # Pin to a known-good ref (tag/branch). Override in Railway template settings if needed.
