@@ -28,6 +28,9 @@ COPY --from=gog-build /usr/local/bin/gog /usr/local/bin/gog
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
+# Enable pnpm via corepack in build stage
+RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
+
 # Install Claude Code CLI (build stage)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
