@@ -50,9 +50,23 @@ ENV NODE_ENV=production
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
+    git \
+    gnupg \
     tini \
     python3 \
     python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI from GitHub's official apt repo
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+ && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | dd of=/etc/apt/keyrings/githubcli-archive-keyring.gpg \
+ && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    > /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=gog-build /usr/local/bin/gog /usr/local/bin/gog
@@ -70,9 +84,7 @@ RUN mkdir -p \
 # openclaw update expects pnpm in runtime
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
-# IMPORTANT:
-# Install Claude Code into the image filesystem, not /data,
-# otherwise Railway's /data volume mount will hide it at runtime.
+# Install Claude Code into the image filesystem, not /data
 RUN npm install -g @anthropic-ai/claude-code \
  && npm cache clean --force
 
