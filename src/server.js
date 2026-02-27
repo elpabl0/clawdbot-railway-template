@@ -1359,6 +1359,61 @@ function attachGatewayAuthHeader(req) {
     req.headers.authorization = `Bearer ${OPENCLAW_GATEWAY_TOKEN}`;
   }
 }
+
+function isWsAuthorized(req) {
+  const base = `http://${req.headers.host || "localhost"}`;
+  const u = new URL(req.url || "/", base);
+
+  // Allow ClawCentral-style ws auth via query token
+  const qToken = u.searchParams.get("token");
+  if (qToken && OPENCLAW_GATEWAY_TOKEN && qToken === OPENCLAW_GATEWAY_TOKEN) {
+    return true;
+  }
+
+  // Optional fallback: dashboard basic auth
+  if (!SETUP_PASSWORD) return true;
+  const header = req.headers.authorization || "";
+  const [scheme, encoded] = header.split(" ");
+  if (scheme === "Basic" && encoded) {
+    const decoded = Buffer.from(encoded, "base64").toString("utf8");
+    const idx = decoded.indexOf(":");
+    const password = idx >= 0 ? decoded.slice(idx + 1) : "";
+    return password === SETUP_PASSWORD;
+  }
+  return false;
+}
+
+proxy.on("proxyReqWs", (proxyReq) => {
+  if (OPENCLAW_GATEWAY_TOKEN) {
+    proxyReq.setHeader("Authorization", `Bearer ${OPENCLAW_GATEWAY_TOKEN}`);
+  }
+});
+
+server.on("upgrade", async (req, socket, head) => {
+  if (!isWsAuthorized(req)) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
+  if (!isConfigured()) {
+    socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
+  try {
+    await ensureGatewayRunning();
+  } catch {
+    socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
+  attachGatewayAuthHeader(req);
+  proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
+});
+
 app.use(requireDashboardAuth, async (req, res) => {
   // If not configured, force users to /setup for any non-setup routes.
   if (!isConfigured() && !req.path.startsWith("/setup")) {
