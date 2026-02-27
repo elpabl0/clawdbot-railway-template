@@ -752,7 +752,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     // remains correct when X-Forwarded-* headers are present.
     await runCmd(
       OPENCLAW_NODE,
-      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"]) ]),
+      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
     );
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
