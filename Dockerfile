@@ -28,7 +28,7 @@ RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
 WORKDIR /openclaw
 
-ARG OPENCLAW_GIT_REF=v2026.2.9
+ARG OPENCLAW_GIT_REF=v2026.3.13-1
 RUN git clone --depth 1 --branch "${OPENCLAW_GIT_REF}" https://github.com/openclaw/openclaw.git .
 
 RUN set -eux; \
